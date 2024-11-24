@@ -1,31 +1,29 @@
--- Creating the Student table
 CREATE TABLE IF NOT EXISTS Student (
     student_id SERIAL PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100),
-    phone VARCHAR(15),
+    email VARCHAR(100) UNIQUE,
+    phone VARCHAR(15) UNIQUE,
     postal_address VARCHAR(255)
 );
--- Creating the LibraryCard table
 CREATE TABLE IF NOT EXISTS LibraryCard (
     card_id SERIAL PRIMARY KEY,
     student_id INT NOT NULL,
     activation_date DATE NOT NULL,
     status BOOLEAN DEFAULT TRUE,
-    resource_type VARCHAR(50) NOT NULL,
+    resource VARCHAR(255) NOT NULL,
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE
 );
--- Creating the Book table
 CREATE TABLE IF NOT EXISTS Book (
     book_code VARCHAR(17) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     pages INT,
+    author VARCHAR(255),
+    publisher VARCHAR(255),
     publication_year INT,
     language VARCHAR(50),
     subject VARCHAR(100)
 );
--- Creating the Book_copy table
 CREATE TABLE IF NOT EXISTS Book_copy (
     copy_id SERIAL PRIMARY KEY,
     book_code VARCHAR(17) NOT NULL,
@@ -36,17 +34,16 @@ CREATE TABLE IF NOT EXISTS Book_copy (
     is_available BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (book_code) REFERENCES Book(book_code) ON DELETE CASCADE
 );
--- Creating the Loan table
 CREATE TABLE IF NOT EXISTS Loan (
     loan_id SERIAL PRIMARY KEY,
     student_id INT NOT NULL,
     copy_id INT NOT NULL,
     loan_date DATE NOT NULL,
     due_date DATE NOT NULL,
+    return_date DATE,
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
     FOREIGN KEY (copy_id) REFERENCES Book_copy(copy_id) ON DELETE CASCADE
 );
--- Creating the User table to handle Admin, LibraryAgent, and StudentUser
 CREATE TABLE IF NOT EXISTS "User" (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -58,16 +55,28 @@ CREATE TABLE IF NOT EXISTS "User" (
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE
 );
 
--- Creating a trigger to enforce loan limits
-CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$ BEGIN IF (
+
+CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$ BEGIN IF NEW.student_id IS NOT NULL THEN IF (
         SELECT COUNT(*)
         FROM Loan
         WHERE student_id = NEW.student_id
-    ) >= 5 THEN RAISE EXCEPTION 'Loan limit exceeded for registered student.';
+    ) >= (
+        CASE
+            WHEN (
+                SELECT COUNT(*)
+                FROM LibraryCard
+                WHERE student_id = NEW.student_id
+            ) = 0 THEN 1 
+            ELSE 5 
+        END
+    ) THEN RAISE EXCEPTION 'Loan limit exceeded for student ID %.',
+    NEW.student_id;
+END IF;
 END IF;
 RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
 DO $$ BEGIN IF NOT EXISTS (
     SELECT 1
     FROM pg_trigger
@@ -76,7 +85,7 @@ DO $$ BEGIN IF NOT EXISTS (
 INSERT ON Loan FOR EACH ROW EXECUTE FUNCTION enforce_loan_limit();
 END IF;
 END $$;
--- Creating a view to list overdue books
+-- View for overdue books
 CREATE OR REPLACE VIEW overdue_books AS
 SELECT b.title,
     bc.barcode,
@@ -88,7 +97,7 @@ FROM Loan l
     JOIN Book b ON bc.book_code = b.book_code
     JOIN Student s ON l.student_id = s.student_id
 WHERE l.due_date < CURRENT_DATE;
--- Creating a view to count available copies of books
+-- View for available book copies
 CREATE OR REPLACE VIEW available_copies AS
 SELECT b.title,
     COUNT(*) AS available_copies
@@ -110,7 +119,7 @@ SET status = FALSE
 WHERE card_id = card_id;
 END;
 $$ LANGUAGE plpgsql;
--- Insert sample data
+-- Insert Sample Data
 INSERT INTO Student (
         first_name,
         last_name,
@@ -143,38 +152,11 @@ INSERT INTO LibraryCard (
         student_id,
         activation_date,
         status,
-        resource_type
+        resource
     )
-SELECT student_id,
-    '2024-01-01',
-    TRUE,
-    'Book'
-FROM Student
-WHERE student_id = 1 ON CONFLICT DO NOTHING;
-INSERT INTO LibraryCard (
-        student_id,
-        activation_date,
-        status,
-        resource_type
-    )
-SELECT student_id,
-    '2024-01-02',
-    TRUE,
-    'Computer'
-FROM Student
-WHERE student_id = 2 ON CONFLICT DO NOTHING;
-INSERT INTO LibraryCard (
-        student_id,
-        activation_date,
-        status,
-        resource_type
-    )
-SELECT student_id,
-    '2024-01-03',
-    FALSE,
-    'MeetingRoom'
-FROM Student
-WHERE student_id = 3 ON CONFLICT DO NOTHING;
+VALUES (1, '2024-01-01', TRUE, 'Computer'),
+    (2, '2024-01-02', TRUE, 'Book'),
+    (3, '2024-01-03', FALSE, 'Meeting room') ON CONFLICT DO NOTHING;
 INSERT INTO Book (
         book_code,
         title,
@@ -221,7 +203,7 @@ VALUES (
         1,
         29.99,
         '2023-05-01',
-        TRUE
+        FALSE
     ),
     (
         '978-3-16-148410-0',

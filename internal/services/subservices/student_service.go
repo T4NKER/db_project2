@@ -2,6 +2,7 @@ package subservices
 
 import(
 	"gorm.io/gorm"
+	"fmt"
 )
 
 type StudentService struct {
@@ -14,24 +15,57 @@ func NewStudentServiceInstance(db *gorm.DB) *StudentService {
 
 func (s *StudentService) GetAvailableResources() ([]map[string]interface{}, error) {
 	var resources []map[string]interface{}
-	err := s.db.Table("books").Select("title, author, isbn").Where("available = ?", true).Find(&resources).Error
+
+	// Join Book and Book_copy, filter for available copies, and group by book details
+	err := s.db.Table("book").
+		Select("book.title, book.author, book.book_code, COUNT(book_copy.copy_id) as available_copies").
+		Joins("JOIN book_copy ON book.book_code = book_copy.book_code").
+		Where("book_copy.is_available = ?", true).
+		Group("book.title, book.author, book.book_code").
+		Find(&resources).Error
+
 	return resources, err
 }
 
 func (s *StudentService) ChangePassword(studentID int, oldPassword, newPassword string) error {
-	var storedPassword string
-	err := s.db.Table("students").Select("password").Where("id = ?", studentID).Scan(&storedPassword).Error
-	if err != nil || storedPassword != oldPassword {
-		return err 
-	}
+    var storedPassword string
 
-	return s.db.Table("students").Where("id = ?", studentID).Update("password", newPassword).Error
+    // Fetch the stored password for the student
+    err := s.db.Table("User").Select("password").Where("student_id = ?", studentID).Scan(&storedPassword).Error
+    if err != nil {
+        return fmt.Errorf("failed to fetch stored password: %w", err)
+    }
+
+    // Compare the old password with the stored password
+    if storedPassword != oldPassword {
+        return fmt.Errorf("old password does not match")
+    }
+
+    // Update the password
+    result := s.db.Table("User").Where("student_id = ?", studentID).Update("password", newPassword)
+    if result.Error != nil {
+        return fmt.Errorf("failed to update password: %w", result.Error)
+    }
+
+    if result.RowsAffected == 0 {
+        return fmt.Errorf("no rows were updated, check if student_id is valid")
+    }
+
+    return nil
 }
 
 func (s *StudentService) GetLoansByStudentID(studentID int) ([]map[string]interface{}, error) {
 	var loans []map[string]interface{}
-    err := s.db.Table("loans").Select("book_title, loan_date, due_date").Where("student_id =?", studentID).Find(&loans).Error
-    return loans, err
+
+	// Join Loan, Book_copy, and Book to fetch the book title and loan details
+	err := s.db.Table("loan").
+    Select("book.title AS book_title, loan.loan_date AS loan_date, loan.due_date AS due_date").
+    Joins("JOIN book_copy ON loan.copy_id = book_copy.copy_id").
+    Joins("JOIN book ON book_copy.book_code = book.book_code").
+    Where("loan.student_id = ?", studentID).
+    Find(&loans).Error
+
+	return loans, err
 }
 
 func (s *StudentService) ViewStudentProfile(studentID int) (map[string]interface{}, error) {

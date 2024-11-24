@@ -27,24 +27,26 @@ func InitAdministratorAPI(router *gin.Engine, adminService *subservices.Administ
 
 func (h *AdminHandler) CreateStudent(c *gin.Context) {
 	var reqData struct {
-		Name           string `json:"name" binding:"required"`
-		Email          string `json:"email" binding:"required,email"`
-		Phone          string `json:"phone" binding:"required"`
-		CardType       string `json:"card_type" binding:"required"`
-		ActivationDate string `json:"activation_date" binding:"required"`
+		FirstName     string `form:"first_name" binding:"required"`
+		LastName      string `form:"last_name" binding:"required"`
+		Email         string `form:"email" binding:"required,email"`
+		Phone         string `form:"phone" binding:"required"`
+		PostalAddress string `form:"postal_address" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&reqData); err != nil {
+	// Parse form data
+	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Call the service
 	err := h.administratorService.CreateStudentWithCard(
-		reqData.Name,
+		reqData.FirstName,
+		reqData.LastName,
 		reqData.Email,
 		reqData.Phone,
-		reqData.CardType,
-		reqData.ActivationDate,
+		reqData.PostalAddress,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student", "details": err.Error()})
@@ -56,18 +58,19 @@ func (h *AdminHandler) CreateStudent(c *gin.Context) {
 
 func (h *AdminHandler) ActivateCard(c *gin.Context) {
 	var reqData struct {
-		CardID int  `json:"card_id"`
-		Status bool `json:"status"`
+		StudentID int `form:"student_id" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&reqData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+	// Parse form data
+	if err := c.ShouldBind(&reqData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 		return
 	}
 
-	err := h.administratorService.ActivateCard(reqData.CardID, reqData.Status)
+	// Call the service to toggle the card status
+	err := h.administratorService.ActivateCard(reqData.StudentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update card status"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update card status", "details": err.Error()})
 		return
 	}
 
@@ -76,32 +79,31 @@ func (h *AdminHandler) ActivateCard(c *gin.Context) {
 
 func (h *AdminHandler) AddResource(c *gin.Context) {
 	var reqData struct {
-		Title        string  `json:"title"`
-		Author       string  `json:"author"`
-		ISBN         string  `json:"isbn"`
-		Rack         string  `json:"rack"`
-		Price        float64 `json:"price"`
-		PurchaseDate string  `json:"purchase_date"`
+		BookCode     string  `form:"book_code" binding:"required"`   
+		Rack         string  `form:"rack" binding:"required"`       
+		Barcode      string  `form:"barcode" binding:"required"`    
+		Price        float64 `form:"price" binding:"required"`      
+		PurchaseDate string  `form:"purchase_date" binding:"required"` 
 	}
 
-	if err := c.ShouldBindJSON(&reqData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+	// Parse form data
+	if err := c.ShouldBind(&reqData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 		return
 	}
 
+	// Call the service
 	err := h.administratorService.AddResource(
-		reqData.Title,
-		reqData.Author,
-		reqData.ISBN,
+		reqData.BookCode,
 		reqData.Rack,
+		reqData.Barcode,
 		reqData.Price,
 		reqData.PurchaseDate,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add resource"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add resource", "details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Resource added successfully"})
 }
-

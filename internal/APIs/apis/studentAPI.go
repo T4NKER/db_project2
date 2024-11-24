@@ -2,7 +2,9 @@ package apis
 
 import (
 	"db_project2/internal/services/subservices"
+	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +22,7 @@ func InitStudentAPI(router *gin.Engine, studentService *subservices.StudentServi
 	studentRoutes := router.Group("/student")
 	{
 		studentRoutes.GET("/resources", handler.ListAvailableResources)
-		studentRoutes.GET("/loans", handler.ListLoans)
+		studentRoutes.POST("/loans", handler.ListLoans)
 		studentRoutes.PATCH("/update-password", handler.UpdatePassword)
 	}
 }
@@ -38,8 +40,18 @@ func (h *StudentHandler) ListAvailableResources(c *gin.Context) {
 
 // ListLoans handles listing the current loans for the student.
 func (h *StudentHandler) ListLoans(c *gin.Context) {
-	// Assume student ID is extracted from authentication middleware
-	studentID := c.GetInt("student_id")
+	studentIDStr := c.PostForm("student_id")
+	if studentIDStr == "" {
+		c.JSON(400, gin.H{"error": "student_id is required"})
+		return
+	}
+
+	studentID, err := strconv.Atoi(studentIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid student_id"})
+		return
+	}
+	log.Println(studentID)
 
 	loans, err := h.studentService.GetLoansByStudentID(studentID)
 	if err != nil {
@@ -53,21 +65,28 @@ func (h *StudentHandler) ListLoans(c *gin.Context) {
 // UpdatePassword handles updating the password for the student.
 func (h *StudentHandler) UpdatePassword(c *gin.Context) {
 	var reqData struct {
-		OldPassword string `json:"old_password" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required"`
+		OldPassword string `form:"old_password" binding:"required"`
+		NewPassword string `form:"new_password" binding:"required"`
+		StudentID   string `form:"student_id" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&reqData); err != nil {
+	// Bind form data (handles application/x-www-form-urlencoded)
+	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	// Assume student ID is extracted from authentication middleware
-	studentID := c.GetInt("student_id")
+	studentIDInt, _ := strconv.Atoi(reqData.StudentID)
 
-	err := h.studentService.ChangePassword(studentID, reqData.OldPassword, reqData.NewPassword)
+	log.Println(reqData)
+
+	// Call the service to change the password
+	err := h.studentService.ChangePassword(studentIDInt, reqData.OldPassword, reqData.NewPassword)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to update password",
+			"details": err.Error(),
+		})
 		return
 	}
 

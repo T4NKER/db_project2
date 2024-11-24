@@ -10,7 +10,7 @@ services:
     volumes:
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql  # Mount the init script here
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - db_network
 
