@@ -20,7 +20,6 @@ func (a *AdministratorService) AddResource(bookCode, rack, barcode string, price
 		return fmt.Errorf("price cannot be negative")
 	}
 
-	// Insert into the "Book_copy" table
 	err := a.db.Table("book_copy").Create(map[string]interface{}{
 		"book_code":     bookCode,     
 		"rack_number":   rack,        

@@ -3,7 +3,6 @@ package apis
 import (
 	"db_project2/internal/services/subservices"
 	"net/http"
-	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -43,13 +42,11 @@ func (h *LibraryAgentHandler) MarkResourceAsReturned(c *gin.Context) {
 		LoanID int `form:"loan_id" binding:"required"`
 	}
 
-	// Bind form data (application/x-www-form-urlencoded)
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 		return
 	}
 
-	// Call the service to mark the resource as returned
 	err := h.libraryAgentService.MarkResourceReturned(reqData.LoanID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark resource as returned", "details": err.Error()})
@@ -83,11 +80,6 @@ func (h *LibraryAgentHandler) AssignResource(c *gin.Context) {
 		BookCode         string `form:"book_code" binding:"required"`
 	}
 
-	// Debugging logs
-	log.Println("Request Headers:", c.Request.Header)
-	log.Println("Request Form Data:", c.Request.PostForm)
-
-	// Bind form data
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Invalid input",
@@ -96,9 +88,6 @@ func (h *LibraryAgentHandler) AssignResource(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Parsed Request Data: %+v\n", reqData)
-
-	// Call the service to assign the resource
 	err := h.libraryAgentService.AssignResource(reqData.StudentID, reqData.BookCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

@@ -27,7 +27,6 @@ func InitStudentAPI(router *gin.Engine, studentService *subservices.StudentServi
 	}
 }
 
-// ListAvailableResources handles listing resources available for students.
 func (h *StudentHandler) ListAvailableResources(c *gin.Context) {
 	resources, err := h.studentService.GetAvailableResources()
 	if err != nil {
@@ -38,7 +37,6 @@ func (h *StudentHandler) ListAvailableResources(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"resources": resources})
 }
 
-// ListLoans handles listing the current loans for the student.
 func (h *StudentHandler) ListLoans(c *gin.Context) {
 	studentIDStr := c.PostForm("student_id")
 	if studentIDStr == "" {
@@ -62,7 +60,6 @@ func (h *StudentHandler) ListLoans(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"loans": loans})
 }
 
-// UpdatePassword handles updating the password for the student.
 func (h *StudentHandler) UpdatePassword(c *gin.Context) {
 	var reqData struct {
 		OldPassword string `form:"old_password" binding:"required"`
@@ -70,7 +67,6 @@ func (h *StudentHandler) UpdatePassword(c *gin.Context) {
 		StudentID   string `form:"student_id" binding:"required"`
 	}
 
-	// Bind form data (handles application/x-www-form-urlencoded)
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
@@ -80,7 +76,6 @@ func (h *StudentHandler) UpdatePassword(c *gin.Context) {
 
 	log.Println(reqData)
 
-	// Call the service to change the password
 	err := h.studentService.ChangePassword(studentIDInt, reqData.OldPassword, reqData.NewPassword)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

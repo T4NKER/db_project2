@@ -13,16 +13,13 @@ type LibraryAgentService struct {
 	db *gorm.DB
 }
 
-// NewLibraryAgentServiceInstance initializes a new LibraryAgentService instance
 func NewLibraryAgentServiceInstance(db *gorm.DB) *LibraryAgentService {
 	return &LibraryAgentService{db: db}
 }
 
-// GetOverdueLoans retrieves a list of overdue loans along with student and book details
 func (l *LibraryAgentService) GetOverdueLoans() ([]map[string]interface{}, error) {
 	var overdueLoans []map[string]interface{}
 
-	// Corrected SQL query
 	query := `
         SELECT
             l.loan_id,
@@ -46,12 +43,12 @@ func (l *LibraryAgentService) GetOverdueLoans() ([]map[string]interface{}, error
 	return overdueLoans, nil
 }
 
-// AssignResource assigns a book copy to a user by creating a loan record
+
 func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) error {
 	loanDate := time.Now()
 	dueDate := loanDate.AddDate(0, 0, 15)
 
-	// Start a database transaction
+
 	tx := l.db.Begin()
 
 	var isCardActivated bool
@@ -71,7 +68,7 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 		return fmt.Errorf("library card for student_id %d is not activated", studentID)
 	}
 
-	// Log all available copies for the given book_code
+
 	var availableCopies []int
 	err = tx.Table("book_copy").
 		Select("copy_id").
@@ -106,7 +103,7 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 		return err
 	}
 
-	// Mark the book copy as unavailable
+
 	err = tx.Table("book_copy").Where("copy_id = ?", copyID).Update("is_available", false).Error
 	if err != nil {
 		tx.Rollback()
@@ -114,7 +111,7 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 		return err
 	}
 
-	// Commit the transaction
+
 	if err := tx.Commit().Error; err != nil {
 		log.Printf("Failed to commit transaction for student_id %d and copy_id %d: %v\n", studentID, copyID, err)
 		return err
@@ -124,9 +121,9 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 	return nil
 }
 
-// MarkResourceReturned updates a loan record and the associated book copy status
+
 func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
-	// Start a database transaction
+
 	tx := l.db.Begin()
 
 	var returnDate sql.NullTime
@@ -141,14 +138,12 @@ func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
 		return fmt.Errorf("loan_id %d already has a return_date set", loanID)
 	}
 
-	// Update the return_date for the loan record
 	err = tx.Table("loan").Where("loan_id = ?", loanID).Update("return_date", time.Now()).Error
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	// Fetch the copy_id associated with the loan
 	var copyID int
 	err = tx.Table("loan").Select("copy_id").Where("loan_id = ?", loanID).Scan(&copyID).Error
 	if err != nil {
@@ -156,14 +151,12 @@ func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
 		return err
 	}
 
-	// Update the book copy to mark it as available
 	err = tx.Table("book_copy").Where("copy_id = ?", copyID).Update("is_available", true).Error
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	// Commit the transaction
 	return tx.Commit().Error
 }
 

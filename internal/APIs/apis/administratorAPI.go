@@ -86,13 +86,11 @@ func (h *AdminHandler) AddResource(c *gin.Context) {
 		PurchaseDate string  `form:"purchase_date" binding:"required"` 
 	}
 
-	// Parse form data
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 		return
 	}
 
-	// Call the service
 	err := h.administratorService.AddResource(
 		reqData.BookCode,
 		reqData.Rack,

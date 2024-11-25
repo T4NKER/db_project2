@@ -16,7 +16,6 @@ func NewStudentServiceInstance(db *gorm.DB) *StudentService {
 func (s *StudentService) GetAvailableResources() ([]map[string]interface{}, error) {
 	var resources []map[string]interface{}
 
-	// Join Book and Book_copy, filter for available copies, and group by book details
 	err := s.db.Table("book").
 		Select("book.title, book.author, book.book_code, COUNT(book_copy.copy_id) as available_copies").
 		Joins("JOIN book_copy ON book.book_code = book_copy.book_code").
@@ -30,18 +29,15 @@ func (s *StudentService) GetAvailableResources() ([]map[string]interface{}, erro
 func (s *StudentService) ChangePassword(studentID int, oldPassword, newPassword string) error {
     var storedPassword string
 
-    // Fetch the stored password for the student
     err := s.db.Table("User").Select("password").Where("student_id = ?", studentID).Scan(&storedPassword).Error
     if err != nil {
         return fmt.Errorf("failed to fetch stored password: %w", err)
     }
 
-    // Compare the old password with the stored password
     if storedPassword != oldPassword {
         return fmt.Errorf("old password does not match")
     }
 
-    // Update the password
     result := s.db.Table("User").Where("student_id = ?", studentID).Update("password", newPassword)
     if result.Error != nil {
         return fmt.Errorf("failed to update password: %w", result.Error)
@@ -57,7 +53,6 @@ func (s *StudentService) ChangePassword(studentID int, oldPassword, newPassword 
 func (s *StudentService) GetLoansByStudentID(studentID int) ([]map[string]interface{}, error) {
 	var loans []map[string]interface{}
 
-	// Join Loan, Book_copy, and Book to fetch the book title and loan details
 	err := s.db.Table("loan").
     Select("book.title AS book_title, loan.loan_date AS loan_date, loan.due_date AS due_date").
     Joins("JOIN book_copy ON loan.copy_id = book_copy.copy_id").

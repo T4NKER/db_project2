@@ -12,7 +12,6 @@ import (
 var DB *gorm.DB
 
 func DatabaseInit() *gorm.DB {
-	// Set up environment variables or replace with actual values
 	host := "localhost"
 	port := "5433"
 	user := "postgres"
@@ -20,14 +19,12 @@ func DatabaseInit() *gorm.DB {
 	dbName := "my_database3"
 	sslMode := "disable"
 
-	// Connection string for the target database
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", host, port, user, password, dbName, sslMode)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
 	}
 
-	// Assign to global DB variable
 	DB = db
 
 	log.Println("PRinting database schema...")
@@ -66,7 +63,6 @@ func PrintDatabaseSchema() {
 	for _, table := range tables {
 		fmt.Printf("- %s\n", table.TableName)
 
-		// Query for column information for each table
 		var columns []struct {
 			ColumnName    string
 			DataType      string
@@ -90,13 +86,11 @@ func PrintDatabaseSchema() {
 }
 
 func ExecuteSchemaFile(db *gorm.DB, filePath string) error {
-	// Read the schema file
 	schema, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error reading schema file: %w", err)
 	}
 
-	// Execute the schema SQL
 	if err := db.Exec(string(schema)).Error; err != nil {
 		return fmt.Errorf("error executing schema SQL: %w", err)
 	}
