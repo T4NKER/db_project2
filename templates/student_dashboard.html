@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <script>
+        // Fetch and display available resources
+        async function fetchResources() {
+            try {
+                const response = await fetch('/student/resources', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch resources');
+                }
+
+                const data = await response.json();
+                const resourceList = document.getElementById('resource-list');
+                resourceList.innerHTML = ''; // Clear previous list
+                data.resources.forEach(resource => {
+                    const li = document.createElement('li');
+                    li.textContent = resource.title; // Replace with actual field
+                    resourceList.appendChild(li);
+                });
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Fetch and display loans
+        async function fetchLoans() {
+            const studentID = sessionStorage.getItem('studentID');
+            try {
+                const response = await fetch('/student/loans', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({ student_id: studentID })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch loans');
+                }
+
+                const data = await response.json();
+                const loanList = document.getElementById('loan-list');
+                loanList.innerHTML = ''; // Clear previous list
+                data.loans.forEach(loan => {
+                    const li = document.createElement('li');
+
+                     const dueDate = new Date(loan.due_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                     })
+
+                    li.textContent = `Book: ${loan.book_title}, Due: ${dueDate}`; // Replace with actual fields
+                    loanList.appendChild(li);
+                });
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Update password
+        async function updatePassword(event) {
+            event.preventDefault(); // Prevent form submission
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const studentID = sessionStorage.getItem('studentID');
+
+            try {
+                const response = await fetch('/student/update-password', {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        old_password: oldPassword,
+                        new_password: newPassword,
+                        student_id: studentID
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to update password');
+                }
+
+                alert('Password updated successfully');
+                document.getElementById('update-password-form').reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // Clear sessionStorage
+                    sessionStorage.clear();
+
+                    // Redirect to the login page
+                    window.location.href = '/';
+                } else {
+                    alert('Failed to logout. Please try again.');
+                }
+            } catch (error) {
+                alert('An error occurred during logout: ' + error.message);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Student Dashboard</h1>
+
+    <h2>Available Resources</h2>
+    <button onclick="fetchResources()">Get Resources</button>
+    <ul id="resource-list">
+        <!-- Resources will be populated here -->
+    </ul>
+
+    <h2>Your Loans</h2>
+    <button onclick="fetchLoans()">Get Loans</button>
+    <ul id="loan-list">
+        <!-- Loans will be populated here -->
+    </ul>
+
+    <h2>Update Password</h2>
+    <form id="update-password-form" onsubmit="updatePassword(event)">
+        <label for="old-password">Old Password:</label><br>
+        <input type="password" id="old-password" name="old_password" required><br><br>
+
+        <label for="new-password">New Password:</label><br>
+        <input type="password" id="new-password" name="new_password" required><br><br>
+
+        <button type="submit">Update Password</button>
+    </form>
+
+    <button onclick="logout()">Logout</button>
+</body>
+</html>

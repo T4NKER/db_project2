@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+</head>
+<body>
+    <h1>Welcome to the Library Management System</h1>
+    <form id="loginForm">
+        <label for="username">Username:</label><br>
+        <input type="text" id="username" name="username" required><br><br>
+        
+        <label for="password">Password:</label><br>
+        <input type="password" id="password" name="password" required><br><br>
+        
+        <button type="submit">Login</button>
+    </form>
+
+    <script>
+    document.getElementById("loginForm").addEventListener("submit", async function(event) {
+        event.preventDefault(); // Prevent default form submission
+
+        const formData = new FormData(event.target);
+        const data = new URLSearchParams(formData);
+
+        try {
+            const response = await fetch("/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: data,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Store token and studentID in localStorage
+                sessionStorage.setItem("authToken", result.token);
+                sessionStorage.setItem("studentID", result.studentID);
+
+                // Redirect to the appropriate dashboard
+                window.location.href = result.redirect;
+            } else {
+                alert("Login failed: " + (result.error || "Unknown error"));
+            }
+        } catch (error) {
+            alert("An error occurred: " + error.message);
+        }
+    });
+</script>
+</body>
+</html>

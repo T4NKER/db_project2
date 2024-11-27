@@ -10,5 +10,5 @@ func InitAPI(router *gin.Engine) {
 	apis.InitAdministratorAPI(router, services.AdministratorServiceInstance)
 	apis.InitLibraryAgentAPI(router, services.LibraryAgentServiceInstance)
 	apis.InitStudentAPI(router, services.StudentServiceInstance)
-	apis.InitHomeAPI(router)
+	apis.InitHomeAPI(router, services.AuthServiceInstance)
 }

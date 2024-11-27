@@ -49,7 +49,6 @@ func (h *StudentHandler) ListLoans(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid student_id"})
 		return
 	}
-	log.Println(studentID)
 
 	loans, err := h.studentService.GetLoansByStudentID(studentID)
 	if err != nil {

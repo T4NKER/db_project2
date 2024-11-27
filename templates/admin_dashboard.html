@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <script>
+        // Function to create a student
+        async function createStudent(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+
+            try {
+                const response = await fetch('/admin/create-student', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken')
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to create student');
+                }
+
+                alert('Student created successfully!');
+                event.target.reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Function to activate/deactivate a library card
+        async function activateCard(event) {
+            event.preventDefault();
+
+            const studentID = document.getElementById('activate-card-student-id').value;
+
+            try {
+                const response = await fetch('/admin/activate-card', {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({ student_id: studentID })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to update card status');
+                }
+
+                alert('Card status updated successfully!');
+                document.getElementById('activate-card-form').reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Function to add a resource
+        async function addResource(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+
+            try {
+                const response = await fetch('/admin/add-resource', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken')
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to add resource');
+                }
+
+                alert('Resource added successfully!');
+                event.target.reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken')
+                    }
+                });
+
+                if (response.ok) {
+                    sessionStorage.clear();
+                    window.location.href = '/';
+                } else {
+                    alert('Failed to logout. Please try again.');
+                }
+            } catch (error) {
+                alert('An error occurred during logout: ' + error.message);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+
+    <h2>Create Student</h2>
+    <form id="create-student-form" onsubmit="createStudent(event)">
+        <label for="first-name">First Name:</label><br>
+        <input type="text" id="first-name" name="first_name" required><br><br>
+
+        <label for="last-name">Last Name:</label><br>
+        <input type="text" id="last-name" name="last_name" required><br><br>
+
+        <label for="email">Email:</label><br>
+        <input type="email" id="email" name="email" required><br><br>
+
+        <label for="phone">Phone:</label><br>
+        <input type="text" id="phone" name="phone" required><br><br>
+
+        <label for="postal-address">Postal Address:</label><br>
+        <textarea id="postal-address" name="postal_address" required></textarea><br><br>
+
+        <button type="submit">Create Student</button>
+    </form>
+
+    <h2>Activate/Deactivate Card</h2>
+    <form id="activate-card-form" onsubmit="activateCard(event)">
+        <label for="activate-card-student-id">Student ID:</label><br>
+        <input type="number" id="activate-card-student-id" name="student_id" required><br><br>
+
+        <button type="submit">Update Card Status</button>
+    </form>
+
+    <h2>Add Resource</h2>
+    <form id="add-resource-form" onsubmit="addResource(event)">
+        <label for="book-code">Book Code:</label><br>
+        <input type="text" id="book-code" name="book_code" required><br><br>
+
+        <label for="rack">Rack:</label><br>
+        <input type="text" id="rack" name="rack" required><br><br>
+
+        <label for="barcode">Barcode:</label><br>
+        <input type="text" id="barcode" name="barcode" required><br><br>
+
+        <label for="price">Price:</label><br>
+        <input type="number" id="price" name="price" step="0.01" required><br><br>
+
+        <label for="purchase-date">Purchase Date:</label><br>
+        <input type="date" id="purchase-date" name="purchase_date" required><br><br>
+
+        <button type="submit">Add Resource</button>
+    </form>
+
+    <button onclick="logout()">Logout</button>
+</body>
+</html>
