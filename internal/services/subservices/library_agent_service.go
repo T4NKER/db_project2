@@ -164,18 +164,21 @@ func (l *LibraryAgentService) GetStudentProfile(studentID int) (map[string]inter
 	var profile map[string]interface{}
 
 	query := `
-        SELECT 
-    u.username,
-    s.phone,
-    s.postal_address,
-    COUNT(l.loan_id) AS total_loans
-FROM "User" u
-LEFT JOIN Student s ON u.student_id = s.student_id -- Joining User with Student to access phone and postal_address
-LEFT JOIN Loan l ON s.student_id = l.student_id -- Joining Loan table with Student based on student_id
-WHERE u.user_id = ? -- Replace ? with the actual user_id value when executing the query
-GROUP BY u.username, s.phone, s.postal_address; 
-
+    SELECT 
+    s.first_name, 
+    s.last_name, 
+    s.email, 
+    s.phone, 
+    s.postal_address, 
+    COUNT(l.loan_id) AS total_loans, 
+    COUNT(CASE WHEN l.return_date IS NULL THEN 1 END) AS active_loans
+FROM Student s
+LEFT JOIN Loan l ON s.student_id = l.student_id 
+WHERE s.student_id = ?
+GROUP BY s.first_name, s.last_name, s.email, s.phone, s.postal_address;
     `
+	
+
 
 	err := l.db.Raw(query, studentID).Scan(&profile).Error
 	if err != nil {

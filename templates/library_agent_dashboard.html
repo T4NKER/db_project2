@@ -4,15 +4,187 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Library Agent Dashboard</title>
+    <script>
+        // Fetch and display overdue loans
+        async function fetchOverdueLoans() {
+            try {
+                const response = await fetch('/library-agent/overdue-loans', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch overdue loans');
+                }
+
+                const data = await response.json();
+                const loanList = document.getElementById('overdue-loans-list');
+                loanList.innerHTML = ''; // Clear previous list
+                data.overdue_loans.forEach(loan => {
+                    const li = document.createElement('li');
+                    li.textContent = `Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`; // Replace with actual fields
+                    loanList.appendChild(li);
+                });
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Mark a resource as returned
+        async function markResourceAsReturned(event) {
+            event.preventDefault();
+
+            const loanID = document.getElementById('return-loan-id').value;
+
+            try {
+                const response = await fetch('/library-agent/return-resource', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({ loan_id: loanID })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to mark resource as returned');
+                }
+
+                alert('Resource marked as returned successfully!');
+                document.getElementById('return-resource-form').reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // View a student's profile
+        async function viewStudentProfile(event) {
+            event.preventDefault();
+
+            const studentID = document.getElementById('student-profile-id').value;
+
+            try {
+                const response = await fetch(`/library-agent/student-profile/${studentID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch student profile');
+                }
+
+                const data = await response.json();
+                const profileDiv = document.getElementById('student-profile');
+                profileDiv.innerHTML = `
+                    <p>Name: ${data.student_profile.first_name + " " + data.student_profile.last_name}</p>
+                    <p>Email: ${data.student_profile.email}</p>
+                    <p>Phone: ${data.student_profile.phone}</p>
+                    <p>Postal: ${data.student_profile.postal_address}</p>
+                    <p>Total loans: ${data.student_profile.total_loans}</p>
+                    <p>Total active loans: ${data.student_profile.active_loans}</p>
+                `; // Replace with actual fields
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Assign a resource to a student
+        async function assignResource(event) {
+            event.preventDefault();
+
+            const studentID = document.getElementById('assign-student-id').value;
+            const bookCode = document.getElementById('assign-book-code').value;
+
+            try {
+                const response = await fetch('/library-agent/assign-resource', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken'),
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({ student_id: studentID, book_code: bookCode })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to assign resource');
+                }
+
+                alert('Resource assigned successfully!');
+                document.getElementById('assign-resource-form').reset();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionStorage.getItem('authToken')
+                    }
+                });
+
+                if (response.ok) {
+                    sessionStorage.clear();
+                    window.location.href = '/';
+                } else {
+                    alert('Failed to logout. Please try again.');
+                }
+            } catch (error) {
+                alert('An error occurred during logout: ' + error.message);
+            }
+        }
+    </script>
 </head>
 <body>
     <h1>Library Agent Dashboard</h1>
-    <ul>
-        <li><a href="/library-agent/overdue-loans">List Overdue Loans</a></li>
-        <li><a href="/library-agent/return-resource">Mark Resource as Returned</a></li>
-        <li><a href="/library-agent/student-profile/:student_id">View Student Profile</a></li>
-        <li><a href="/library-agent/assign-resource">Assign Resource</a></li>
+
+    <h2>Overdue Loans</h2>
+    <button onclick="fetchOverdueLoans()">Get Overdue Loans</button>
+    <ul id="overdue-loans-list">
+        <!-- Overdue loans will be populated here -->
     </ul>
-    <a href="/logout">Logout</a>
+
+    <h2>Return Resource</h2>
+    <form id="return-resource-form" onsubmit="markResourceAsReturned(event)">
+        <label for="return-loan-id">Loan ID:</label><br>
+        <input type="number" id="return-loan-id" name="loan_id" required><br><br>
+
+        <button type="submit">Mark as Returned</button>
+    </form>
+
+    <h2>View Student Profile</h2>
+    <form id="student-profile-form" onsubmit="viewStudentProfile(event)">
+        <label for="student-profile-id">Student ID:</label><br>
+        <input type="number" id="student-profile-id" name="student_id" required><br><br>
+
+        <button type="submit">View Profile</button>
+    </form>
+    <div id="student-profile">
+        <!-- Student profile will be populated here -->
+    </div>
+
+    <h2>Assign Resource</h2>
+    <form id="assign-resource-form" onsubmit="assignResource(event)">
+        <label for="assign-student-id">Student ID:</label><br>
+        <input type="number" id="assign-student-id" name="student_id" required><br><br>
+
+        <label for="assign-book-code">Book Code:</label><br>
+        <input type="text" id="assign-book-code" name="book_code" required><br><br>
+
+        <button type="submit">Assign Resource</button>
+    </form>
+
+    <button onclick="logout()">Logout</button>
 </body>
 </html>
