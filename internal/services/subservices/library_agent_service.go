@@ -2,6 +2,7 @@ package subservices
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -34,7 +35,7 @@ func (l *LibraryAgentService) GetOverdueLoans() ([]map[string]interface{}, error
         WHERE l.due_date < CURRENT_DATE AND return_date IS NULL
     `
 
-	// Execute the query
+	
 	err := l.db.Raw(query).Scan(&overdueLoans).Error
 	if err != nil {
 		return nil, err
@@ -43,31 +44,31 @@ func (l *LibraryAgentService) GetOverdueLoans() ([]map[string]interface{}, error
 	return overdueLoans, nil
 }
 
-
 func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) error {
 	loanDate := time.Now()
 	dueDate := loanDate.AddDate(0, 0, 15)
 
+	var cardStatus struct {
+		Status *bool 
+	}
 
 	tx := l.db.Begin()
 
-	var isCardActivated bool
 	err := tx.Table("librarycard").
 		Select("status").
 		Where("student_id = ?", studentID).
-		Scan(&isCardActivated).Error
-	if err != nil {
+		Scan(&cardStatus).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		tx.Rollback()
 		log.Printf("Failed to check library card status for student_id %d: %v\n", studentID, err)
 		return fmt.Errorf("failed to check library card status: %w", err)
 	}
 
-	if !isCardActivated {
+	if cardStatus.Status != nil && !*cardStatus.Status {
 		tx.Rollback()
 		log.Printf("Library card for student_id %d is not activated\n", studentID)
 		return fmt.Errorf("library card for student_id %d is not activated", studentID)
 	}
-
 
 	var availableCopies []int
 	err = tx.Table("book_copy").
@@ -103,14 +104,12 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 		return err
 	}
 
-
 	err = tx.Table("book_copy").Where("copy_id = ?", copyID).Update("is_available", false).Error
 	if err != nil {
 		tx.Rollback()
 		log.Printf("Failed to mark copy_id %d as unavailable: %v\n", copyID, err)
 		return err
 	}
-
 
 	if err := tx.Commit().Error; err != nil {
 		log.Printf("Failed to commit transaction for student_id %d and copy_id %d: %v\n", studentID, copyID, err)
@@ -120,7 +119,6 @@ func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) err
 	log.Printf("Successfully assigned copy_id %d of book_code %s to student_id %d\n", copyID, bookCode, studentID)
 	return nil
 }
-
 
 func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
 
@@ -171,14 +169,12 @@ func (l *LibraryAgentService) GetStudentProfile(studentID int) (map[string]inter
     s.phone, 
     s.postal_address, 
     COUNT(l.loan_id) AS total_loans, 
-    COUNT(CASE WHEN l.return_date IS NULL THEN 1 END) AS active_loans
+    COUNT(CASE WHEN l.loan_id IS NOT NULL AND l.return_date IS NULL THEN 1 END) AS active_loans
 FROM Student s
 LEFT JOIN Loan l ON s.student_id = l.student_id 
 WHERE s.student_id = ?
 GROUP BY s.first_name, s.last_name, s.email, s.phone, s.postal_address;
     `
-	
-
 
 	err := l.db.Raw(query, studentID).Scan(&profile).Error
 	if err != nil {

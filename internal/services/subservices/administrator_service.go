@@ -2,6 +2,7 @@ package subservices
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -21,12 +22,12 @@ func (a *AdministratorService) AddResource(bookCode, rack, barcode string, price
 	}
 
 	err := a.db.Table("book_copy").Create(map[string]interface{}{
-		"book_code":     bookCode,     
-		"rack_number":   rack,        
-		"barcode":       barcode,      
-		"price":         price,        
-		"purchase_date": purchaseDate, 
-		"is_available":  true,         
+		"book_code":     bookCode,
+		"rack_number":   rack,
+		"barcode":       barcode,
+		"price":         price,
+		"purchase_date": purchaseDate,
+		"is_available":  true,
 	}).Error
 	if err != nil {
 		return fmt.Errorf("failed to add resource: %w", err)
@@ -36,35 +37,18 @@ func (a *AdministratorService) AddResource(bookCode, rack, barcode string, price
 }
 
 func (a *AdministratorService) ActivateCard(studentID int) error {
-	var currentStatus bool
-
-	err := a.db.Table("librarycard").
-		Select("status").
-		Where("student_id = ?", studentID).
-		Scan(&currentStatus).Error
-	if err != nil {
-		return fmt.Errorf("failed to fetch card status for student_id %d: %w", studentID, err)
-	}
-
-	newStatus := !currentStatus
-
-	result := a.db.Table("librarycard").
-		Where("student_id = ?", studentID).
-		Update("status", newStatus)
+	result := a.db.Exec("CALL toggle_card_status(?)", studentID)
 	if result.Error != nil {
-		return fmt.Errorf("failed to update card status for student_id %d: %w", studentID, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("no library card found for student_id %d", studentID)
+		return fmt.Errorf("failed to toggle card status for student_id %d: %w", studentID, result.Error)
 	}
 
+	log.Printf("Successfully toggled library card status for student_id %d", studentID)
 	return nil
 }
 
 func (a *AdministratorService) CreateStudentWithCard(firstname, lastname, email, phone, postalAddress string) error {
 	tx := a.db.Begin()
 
-	// Insert student and get the student ID
 	var studentID int
 	err := tx.Table("student").Create(map[string]interface{}{
 		"first_name":     firstname,
@@ -78,26 +62,31 @@ func (a *AdministratorService) CreateStudentWithCard(firstname, lastname, email,
 		return fmt.Errorf("failed to create student: %w", err)
 	}
 
-	// Fetch the student_id using email (assuming it's unique)
 	err = tx.Table("student").Select("student_id").Where("email = ?", email).Scan(&studentID).Error
 	if err != nil || studentID == 0 {
 		tx.Rollback()
 		return fmt.Errorf("failed to fetch student_id: %w", err)
 	}
 
-	// Insert library card for the student
+
+	var resourceID int
+	err = tx.Table("resource").Select("resource_id").Where("resource_type = ?", "Book").Scan(&resourceID).Error
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to fetch resource ID for 'Book': %w", err)
+	}
+
 	err = tx.Table("librarycard").Create(map[string]interface{}{
 		"student_id":      studentID,
 		"activation_date": time.Now(),
-		"status":          true, // Default to active
-		"resource":        "General", // Default resource type
+		"status":          true,
+		"resource_id":     resourceID, 
 	}).Error
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to create library card: %w", err)
 	}
 
-	// Create a user for the student
 	username := fmt.Sprintf("%s.%s", firstname, lastname)
 	password := "default_password"
 	err = tx.Table("User").Create(map[string]interface{}{
@@ -111,7 +100,6 @@ func (a *AdministratorService) CreateStudentWithCard(firstname, lastname, email,
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}

@@ -6,23 +6,63 @@ CREATE TABLE IF NOT EXISTS Student (
     phone VARCHAR(15) UNIQUE,
     postal_address VARCHAR(255)
 );
+CREATE TABLE IF NOT EXISTS Resource (
+    resource_id SERIAL PRIMARY KEY,
+    resource_type VARCHAR(50) NOT NULL CHECK (resource_type IN ('Book', 'Computer', 'Room')),
+    description VARCHAR(255)
+);
 CREATE TABLE IF NOT EXISTS LibraryCard (
     card_id SERIAL PRIMARY KEY,
     student_id INT NOT NULL,
     activation_date DATE NOT NULL,
     status BOOLEAN DEFAULT TRUE,
-    resource VARCHAR(255) NOT NULL,
-    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE
+    resource_id INT NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (resource_id) REFERENCES Resource(resource_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS Book (
     book_code VARCHAR(17) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    pages INT,
-    author VARCHAR(255),
-    publisher VARCHAR(255),
-    publication_year INT,
-    language VARCHAR(50),
-    subject VARCHAR(100)
+    pages INT
+);
+CREATE TABLE IF NOT EXISTS Book_Language (
+    book_code VARCHAR(17) NOT NULL,
+    language VARCHAR(50) NOT NULL,
+    FOREIGN KEY (book_code) REFERENCES Book(book_code) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS Author (
+    author_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    birth_date DATE,
+    nationality VARCHAR(50),
+    biography TEXT
+);
+CREATE TABLE IF NOT EXISTS Book_Author (
+    book_code VARCHAR(17) NOT NULL,
+    author_id INT NOT NULL,
+    FOREIGN KEY (book_code) REFERENCES Book(book_code) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES Author(author_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS Publisher (
+    publisher_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS "Subject" (
+    subject_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS Book_Publisher (
+    book_code VARCHAR(17) NOT NULL,
+    publisher_id INT NOT NULL,
+    FOREIGN KEY (book_code) REFERENCES Book(book_code) ON DELETE CASCADE,
+    FOREIGN KEY (publisher_id) REFERENCES Publisher(publisher_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS Book_Subject (
+    book_code VARCHAR(17) NOT NULL,
+    subject_id INT NOT NULL,
+    FOREIGN KEY (book_code) REFERENCES Book(book_code) ON DELETE CASCADE,
+    FOREIGN KEY (subject_id) REFERENCES "Subject"(subject_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS Book_copy (
     copy_id SERIAL PRIMARY KEY,
@@ -54,29 +94,26 @@ CREATE TABLE IF NOT EXISTS "User" (
     student_id INT,
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE
 );
-
-
-CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$ BEGIN IF NEW.student_id IS NOT NULL THEN IF (
+CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$ BEGIN IF (
+        SELECT COUNT(*)
+        FROM LibraryCard
+        WHERE student_id = NEW.student_id
+    ) = 0 THEN IF (
         SELECT COUNT(*)
         FROM Loan
         WHERE student_id = NEW.student_id
-    ) >= (
-        CASE
-            WHEN (
-                SELECT COUNT(*)
-                FROM LibraryCard
-                WHERE student_id = NEW.student_id
-            ) = 0 THEN 1 
-            ELSE 5 
-        END
-    ) THEN RAISE EXCEPTION 'Loan limit exceeded for student ID %.',
-    NEW.student_id;
+    ) >= 1 THEN RAISE EXCEPTION 'Non-registered students can only borrow 1 book.';
+END IF;
+ELSE IF (
+    SELECT COUNT(*)
+    FROM Loan
+    WHERE student_id = NEW.student_id
+) >= 5 THEN RAISE EXCEPTION 'Registered students can only borrow up to 5 books.';
 END IF;
 END IF;
 RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DO $$ BEGIN IF NOT EXISTS (
     SELECT 1
     FROM pg_trigger
@@ -85,7 +122,6 @@ DO $$ BEGIN IF NOT EXISTS (
 INSERT ON Loan FOR EACH ROW EXECUTE FUNCTION enforce_loan_limit();
 END IF;
 END $$;
--- View for overdue books
 CREATE OR REPLACE VIEW overdue_books AS
 SELECT b.title,
     bc.barcode,
@@ -97,29 +133,42 @@ FROM Loan l
     JOIN Book b ON bc.book_code = b.book_code
     JOIN Student s ON l.student_id = s.student_id
 WHERE l.due_date < CURRENT_DATE;
--- View for available book copies
 CREATE OR REPLACE VIEW available_copies AS
 SELECT b.title,
+    STRING_AGG(
+        DISTINCT a.first_name || ' ' || a.last_name,
+        ', '
+    ) AS authors,
+    STRING_AGG(DISTINCT bl.language, ', ') AS languages,
+    p.name AS publisher,
     COUNT(*) AS available_copies
 FROM Book b
     JOIN Book_copy bc ON b.book_code = bc.book_code
+    LEFT JOIN Book_Author ba ON b.book_code = ba.book_code
+    LEFT JOIN Author a ON ba.author_id = a.author_id
+    LEFT JOIN Book_Language bl ON b.book_code = bl.book_code
+    LEFT JOIN Book_Publisher bp ON b.book_code = bp.book_code
+    LEFT JOIN Publisher p ON bp.publisher_id = p.publisher_id
 WHERE bc.is_available = TRUE
-GROUP BY b.title;
--- Procedure to activate a library card
-CREATE OR REPLACE PROCEDURE activate_card(card_id INT) AS $$ BEGIN
+GROUP BY b.title,
+    p.name;
+CREATE OR REPLACE PROCEDURE toggle_card_status(student_id INT) AS $$ BEGIN -- 
+    IF NOT EXISTS (
+        SELECT 1
+        FROM LibraryCard
+        WHERE LibraryCard.student_id = toggle_card_status.student_id
+    ) THEN RAISE EXCEPTION 'No library card found for student_id %',
+    student_id;
+END IF;
 UPDATE LibraryCard
-SET status = TRUE
-WHERE card_id = card_id;
+SET status = NOT status
+WHERE LibraryCard.student_id = toggle_card_status.student_id;
 END;
 $$ LANGUAGE plpgsql;
--- Procedure to deactivate a library card
-CREATE OR REPLACE PROCEDURE deactivate_card(card_id INT) AS $$ BEGIN
-UPDATE LibraryCard
-SET status = FALSE
-WHERE card_id = card_id;
-END;
-$$ LANGUAGE plpgsql;
--- Insert Sample Data
+INSERT INTO Resource (resource_type, description)
+VALUES ('Book', 'General books available for loan'),
+    ('Computer', 'Library computers for student use'),
+    ('Room', 'Study rooms available for reservation');
 INSERT INTO Student (
         first_name,
         last_name,
@@ -148,47 +197,27 @@ VALUES (
         '1122334455',
         '789 Pine Road'
     ) ON CONFLICT DO NOTHING;
-INSERT INTO LibraryCard (
-        student_id,
-        activation_date,
-        status,
-        resource
-    )
-VALUES (1, '2024-01-01', TRUE, 'Computer'),
-    (2, '2024-01-02', TRUE, 'Book'),
-    (3, '2024-01-03', FALSE, 'Meeting room') ON CONFLICT DO NOTHING;
-INSERT INTO Book (
-        book_code,
-        title,
-        pages,
-        publication_year,
-        language,
-        subject
-    )
+INSERT INTO LibraryCard (student_id, activation_date, status, resource_id)
+VALUES (1, '2024-01-01', TRUE, 1),
+    (2, '2024-01-02', TRUE, 2);
+INSERT INTO Book (book_code, title, pages)
 VALUES (
         '978-3-16-148410-0',
         'Introduction to Databases',
-        300,
-        2020,
-        'English',
-        'Computer Science'
+        300
     ),
     (
         '978-0-262-13472-9',
         'Artificial Intelligence: A Modern Approach',
-        1000,
-        2018,
-        'English',
-        'AI'
+        1000
     ),
-    (
-        '978-1-56619-909-4',
-        'Learning SQL',
-        350,
-        2021,
-        'English',
-        'Databases'
-    ) ON CONFLICT DO NOTHING;
+    ('978-1-56619-909-4', 'Learning SQL', 350);
+INSERT INTO Book_Language (book_code, language)
+VALUES ('978-3-16-148410-0', 'English'),
+    ('978-3-16-148410-0', 'Spanish'),
+    ('978-0-262-13472-9', 'English'),
+    ('978-1-56619-909-4', 'English'),
+    ('978-1-56619-909-4', 'French');
 INSERT INTO Book_copy (
         book_code,
         barcode,
@@ -242,3 +271,51 @@ VALUES ('admin1', 'adminpass', 'Admin', NULL),
     ),
     ('johndoe', 'studentpass', 'Student', 1),
     ('janesmith', 'studentpass', 'Student', 2) ON CONFLICT DO NOTHING;
+INSERT INTO Author (
+        first_name,
+        last_name,
+        birth_date,
+        nationality,
+        biography
+    )
+VALUES (
+        'John',
+        'Stone',
+        '1975-05-15',
+        'American',
+        'Expert in Databases and Data Structures'
+    ),
+    (
+        'Stuart',
+        'Russell',
+        '1962-06-22',
+        'British',
+        'Renowned for AI research and books'
+    ),
+    (
+        'Mary',
+        'Robertson',
+        '1980-11-03',
+        'Canadian',
+        'Author specializing in SQL and relational databases'
+    );
+INSERT INTO Publisher (name)
+VALUES ('Books n Pieces'),
+    ('TechPress'),
+    ('Global Publishing');
+INSERT INTO "Subject" (name)
+VALUES ('Databases'),
+    ('Artificial Intelligence'),
+    ('SQL');
+INSERT INTO Book_Author (book_code, author_id)
+VALUES ('978-3-16-148410-0', 1),
+    ('978-0-262-13472-9', 2),
+    ('978-1-56619-909-4', 3);
+INSERT INTO Book_Publisher (book_code, publisher_id)
+VALUES ('978-3-16-148410-0', 1),
+    ('978-0-262-13472-9', 2),
+    ('978-1-56619-909-4', 3);
+INSERT INTO Book_Subject (book_code, subject_id)
+VALUES ('978-3-16-148410-0', 1),
+    ('978-0-262-13472-9', 2),
+    ('978-1-56619-909-4', 3);

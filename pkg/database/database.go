@@ -27,17 +27,17 @@ func DatabaseInit() *gorm.DB {
 
 	DB = db
 
-	log.Println("PRinting database schema...")
+	//log.Println("PRinting database schema...")
 
-	PrintDatabaseSchema()
+	//PrintDatabaseSchema()
 
 	// Execute schema SQL file
-	/*  schemaPath := "/home/t4nk/db_project2/pkg/database/migrations/sql.sql"
+	 schemaPath := "/home/t4nk/db_project2/pkg/database/migrations/sql.sql"
 	if err := ExecuteSchemaFile(db, schemaPath); err != nil {
 		log.Fatalf("Failed to execute schema file: %v", err)
-	}  */
+	} 
 
-	PrintDatabaseSchema()
+	//PrintDatabaseSchema()
 
 	return DB
 }

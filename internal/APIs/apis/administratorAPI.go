@@ -34,13 +34,13 @@ func (h *AdminHandler) CreateStudent(c *gin.Context) {
 		PostalAddress string `form:"postal_address" binding:"required"`
 	}
 
-	// Parse form data
+
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Call the service
+
 	err := h.administratorService.CreateStudentWithCard(
 		reqData.FirstName,
 		reqData.LastName,
@@ -61,13 +61,13 @@ func (h *AdminHandler) ActivateCard(c *gin.Context) {
 		StudentID int `form:"student_id" binding:"required"`
 	}
 
-	// Parse form data
+
 	if err := c.ShouldBind(&reqData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 		return
 	}
 
-	// Call the service to toggle the card status
+
 	err := h.administratorService.ActivateCard(reqData.StudentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update card status", "details": err.Error()})

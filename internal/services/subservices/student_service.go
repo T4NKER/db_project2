@@ -1,8 +1,10 @@
 package subservices
 
-import(
-	"gorm.io/gorm"
+import (
 	"fmt"
+	"log"
+
+	"gorm.io/gorm"
 )
 
 type StudentService struct {
@@ -16,14 +18,16 @@ func NewStudentServiceInstance(db *gorm.DB) *StudentService {
 func (s *StudentService) GetAvailableResources() ([]map[string]interface{}, error) {
 	var resources []map[string]interface{}
 
-	err := s.db.Table("book").
-		Select("book.title, book.author, book.book_code, COUNT(book_copy.copy_id) as available_copies").
-		Joins("JOIN book_copy ON book.book_code = book_copy.book_code").
-		Where("book_copy.is_available = ?", true).
-		Group("book.title, book.author, book.book_code").
-		Find(&resources).Error
+	err := s.db.Table("available_copies").
+		Select("title, authors, languages, publisher, available_copies").
+		Scan(&resources).Error
 
-	return resources, err
+	if err != nil {
+		log.Printf("Error fetching available resources: %v", err)
+		return nil, err
+	}
+
+	return resources, nil
 }
 
 func (s *StudentService) ChangePassword(studentID int, oldPassword, newPassword string) error {
