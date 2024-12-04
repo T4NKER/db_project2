@@ -2,8 +2,9 @@ package database
 
 import (
 	"fmt"
-	"os"
 	"log"
+	"os"
+	"path/filepath"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -12,12 +13,12 @@ import (
 var DB *gorm.DB
 
 func DatabaseInit() *gorm.DB {
-	host := "localhost"
-	port := "5433"
-	user := "postgres"
-	password := "postgres"
-	dbName := "my_database3"
-	sslMode := "disable"
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	sslMode := os.Getenv("DB_SSLMODE")
 
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", host, port, user, password, dbName, sslMode)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -32,11 +33,16 @@ func DatabaseInit() *gorm.DB {
 	//PrintDatabaseSchema()
 
 	// Execute schema SQL file
-	 schemaPath := "/home/t4nk/db_project2/pkg/database/migrations/sql.sql"
+	root, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get the working directory: %v", err)
+	}
+
+	// Construct the dynamic schema path
+	schemaPath := filepath.Join(root, "pkg", "database", "migrations", "sql.sql")
 	if err := ExecuteSchemaFile(db, schemaPath); err != nil {
 		log.Fatalf("Failed to execute schema file: %v", err)
-	} 
-
+	}
 	//PrintDatabaseSchema()
 
 	return DB
