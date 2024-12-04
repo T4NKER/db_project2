@@ -7,8 +7,10 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: my_database3
     volumes:
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - /home/t4nk/db_project2/pkg/database/migrations/01-init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
+      - /home/t4nk/db_project2/pkg/database/migrations/02-create-tables.sql:/docker-entrypoint-initdb.d/02-create-tables.sql
     ports:
       - "5433:5432"
     networks:
