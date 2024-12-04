@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
+	//"path/filepath"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -27,23 +27,6 @@ func DatabaseInit() *gorm.DB {
 	}
 
 	DB = db
-
-	//log.Println("PRinting database schema...")
-
-	//PrintDatabaseSchema()
-
-	// Execute schema SQL file
-	root, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Failed to get the working directory: %v", err)
-	}
-
-	// Construct the dynamic schema path
-	schemaPath := filepath.Join(root, "pkg", "database", "migrations", "sql.sql")
-	if err := ExecuteSchemaFile(db, schemaPath); err != nil {
-		log.Fatalf("Failed to execute schema file: %v", err)
-	}
-	//PrintDatabaseSchema()
 
 	return DB
 }
