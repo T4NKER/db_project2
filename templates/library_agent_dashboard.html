@@ -25,7 +25,7 @@
                 loanList.innerHTML = ''; // Clear previous list
                 data.overdue_loans.forEach(loan => {
                     const li = document.createElement('li');
-                    li.textContent = `Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`; // Replace with actual fields
+                    li.textContent = `LoanID: ${loan.loan_id}, Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`; // Replace with actual fields
                     loanList.appendChild(li);
                 });
             } catch (error) {
