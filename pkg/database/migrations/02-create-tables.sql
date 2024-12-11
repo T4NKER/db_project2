@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS Loan (
     copy_id INT NOT NULL,
     loan_date DATE NOT NULL,
     due_date DATE NOT NULL,
-    return_date DATE,
+    return_date DATE DEFAULT NULL,
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
     FOREIGN KEY (copy_id) REFERENCES Book_copy(copy_id) ON DELETE CASCADE
 );
@@ -94,21 +94,35 @@ CREATE TABLE IF NOT EXISTS "User" (
     student_id INT,
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE
 );
-CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$ BEGIN IF (
-        SELECT COUNT(*)
-        FROM LibraryCard
-        WHERE student_id = NEW.student_id
-    ) = 0 THEN IF (
-        SELECT COUNT(*)
-        FROM Loan
-        WHERE student_id = NEW.student_id
-    ) >= 1 THEN RAISE EXCEPTION 'Non-registered students can only borrow 1 book.';
-END IF;
-ELSE IF (
+CREATE OR REPLACE FUNCTION enforce_loan_limit() RETURNS TRIGGER AS $$
+DECLARE active_loans_count INT;
+active_loans_details TEXT;
+BEGIN -- Count the number of active loans for the student
+SELECT COUNT(*) INTO active_loans_count
+FROM Loan
+WHERE student_id = NEW.student_id
+    AND return_date IS NULL;
+-- Retrieve details of active loans (for debugging purposes)
+SELECT STRING_AGG(loan_id::TEXT || '-' || copy_id::TEXT, ', ') INTO active_loans_details
+FROM Loan
+WHERE student_id = NEW.student_id
+    AND return_date IS NULL;
+-- Check if the student is not registered
+IF (
     SELECT COUNT(*)
-    FROM Loan
+    FROM LibraryCard
     WHERE student_id = NEW.student_id
-) >= 5 THEN RAISE EXCEPTION 'Registered students can only borrow up to 5 books.';
+) = 0 THEN -- Raise exception if the limit is exceeded
+IF active_loans_count >= 1 THEN RAISE EXCEPTION 'Non-registered student % has % active loan(s): [%]. Only 1 book allowed.',
+NEW.student_id,
+active_loans_count,
+active_loans_details;
+END IF;
+ELSE -- Raise exception if the limit is exceeded for registered students
+IF active_loans_count >= 5 THEN RAISE EXCEPTION 'Registered student % has % active loan(s): [%]. Up to 5 books allowed.',
+NEW.student_id,
+active_loans_count,
+active_loans_details;
 END IF;
 END IF;
 RETURN NEW;

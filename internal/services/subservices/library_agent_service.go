@@ -44,6 +44,31 @@ func (l *LibraryAgentService) GetOverdueLoans() ([]map[string]interface{}, error
 	return overdueLoans, nil
 }
 
+func (l *LibraryAgentService) GetAllLoans() ([]map[string]interface{}, error) {
+	var loans []map[string]interface{}
+
+	query := `
+        SELECT
+            l.loan_id,
+            l.due_date,
+            CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+            b.title AS book_title,
+            bc.barcode
+        FROM loan l
+        JOIN student s ON l.student_id = s.student_id
+        JOIN book_copy bc ON l.copy_id = bc.copy_id
+        JOIN book b ON bc.book_code = b.book_code
+		WHERE l.return_date is NULL
+    `
+
+	err := l.db.Raw(query).Scan(&loans).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return loans, nil
+}
+
 func (l *LibraryAgentService) AssignResource(studentID int, bookCode string) error {
 	loanDate := time.Now()
 	dueDate := loanDate.AddDate(0, 0, 15)
@@ -182,4 +207,34 @@ GROUP BY s.first_name, s.last_name, s.email, s.phone, s.postal_address;
 	}
 
 	return profile, nil
+}
+
+func (l *LibraryAgentService) GetAllAvailableBooks() ([]map[string]interface{}, error) {
+	var availableBooks []map[string]interface{}
+
+	query := `
+        SELECT
+    b.book_code,
+    b.title,
+    COUNT(DISTINCT bc.copy_id) AS available_copies,
+    STRING_AGG(DISTINCT CONCAT(a.first_name, ' ', a.last_name), ', ') AS authors,
+    STRING_AGG(DISTINCT s.name, ', ') AS subjects,
+    STRING_AGG(DISTINCT bl.language, ', ') AS languages
+FROM book b
+LEFT JOIN book_copy bc ON b.book_code = bc.book_code AND bc.is_available = TRUE
+LEFT JOIN book_author ba ON b.book_code = ba.book_code
+LEFT JOIN author a ON ba.author_id = a.author_id
+LEFT JOIN book_subject bs ON b.book_code = bs.book_code
+LEFT JOIN "Subject" s ON bs.subject_id = s.subject_id
+LEFT JOIN book_language bl ON b.book_code = bl.book_code
+GROUP BY b.book_code, b.title
+HAVING COUNT(DISTINCT bc.copy_id) > 0
+    `
+
+	err := l.db.Raw(query).Scan(&availableBooks).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return availableBooks, nil
 }

@@ -2,6 +2,7 @@ package apis
 
 import (
 	"db_project2/internal/services/subservices"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -24,6 +25,8 @@ func InitLibraryAgentAPI(router *gin.Engine, agentService *subservices.LibraryAg
 		agentRoutes.POST("/return-resource", handler.MarkResourceAsReturned)
 		agentRoutes.GET("/student-profile/:student_id", handler.ViewStudentProfile)
 		agentRoutes.POST("/assign-resource", handler.AssignResource)
+		agentRoutes.GET("/all-loans", handler.GetAllLoans)
+		agentRoutes.GET("/all-books", handler.GetAllAvailableBooks)
 	}
 }
 
@@ -100,4 +103,25 @@ func (h *LibraryAgentHandler) AssignResource(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Resource assigned successfully",
 	})
+}
+
+func (h *LibraryAgentHandler) GetAllLoans(c *gin.Context) {
+	loans, err := h.libraryAgentService.GetAllLoans()
+	if err!= nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch all loans"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"loans": loans})
+}
+
+func (h *LibraryAgentHandler) GetAllAvailableBooks(c *gin.Context) {
+	books, err := h.libraryAgentService.GetAllAvailableBooks() 
+	if err != nil {
+		log.Println("ERROR:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting all available books"})
+        return
+	}
+
+    c.JSON(http.StatusOK, gin.H{"books": books})
 }

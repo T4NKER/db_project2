@@ -22,18 +22,51 @@
 
                 const data = await response.json();
                 const loanList = document.getElementById('overdue-loans-list');
-                loanList.innerHTML = ''; // Clear previous list
-                data.overdue_loans.forEach(loan => {
-                    const li = document.createElement('li');
-                    li.textContent = `LoanID: ${loan.loan_id}, Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`; // Replace with actual fields
-                    loanList.appendChild(li);
-                });
+                loanList.innerHTML = ''; 
+                if (!data.overdue_loans || data.overdue_loans.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'No overdue loans found.';
+    loanList.appendChild(li);
+} else {
+    data.overdue_loans.forEach(loan => {
+        const li = document.createElement('li');
+        li.textContent = `LoanID: ${loan.loan_id}, Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`;
+        loanList.appendChild(li);
+    });
+}
             } catch (error) {
                 alert(error.message);
             }
         }
 
-        // Mark a resource as returned
+        async function fetchAllLoans() {
+    try {
+        const response = await fetch('/library-agent/all-loans', {
+            method: 'GET',
+            headers: {
+                'Authorization': sessionStorage.getItem('authToken'),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch all loans');
+        }
+
+        const data = await response.json();
+        const loanList = document.getElementById('all-loans-list');
+        loanList.innerHTML = ''; 
+        data.loans.forEach(loan => {
+            const li = document.createElement('li');
+            li.textContent = `LoanID: ${loan.loan_id}, Person: ${loan.student_name}, Book: ${loan.book_title}, Due: ${new Date(loan.due_date).toLocaleDateString()}`;
+            loanList.appendChild(li);
+        });
+    } catch (error) {
+        loanList.innerHTML = 'No loans available';
+        alert(error.message);
+    }
+}
+
         async function markResourceAsReturned(event) {
             event.preventDefault();
 
@@ -124,6 +157,52 @@
             }
         }
 
+        async function fetchAvailableBooks(event) {
+    event.preventDefault(); // Prevent form submission and page reload
+
+    try {
+        const response = await fetch('/library-agent/all-books', {
+            method: 'GET',
+            headers: {
+                'Authorization': sessionStorage.getItem('authToken'),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch available books');
+        }
+
+        const data = await response.json();
+        const booksContainer = document.getElementById('available-books');
+        booksContainer.innerHTML = ''; // Clear previous results
+
+        if (data.books.length === 0) {
+            booksContainer.innerHTML = '<p>No available books found.</p>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        data.books.forEach(book => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <strong>Title:</strong> ${book.title}<br>
+                <strong>Authors:</strong> ${book.authors}<br>
+                <strong>Subjects:</strong> ${book.subjects}<br>
+                <strong>Languages:</strong> ${book.languages}<br>
+                <strong>Book code:</strong> ${book.book_code}<br>
+                <strong>Available Copies:</strong> ${book.available_copies}<br><br>
+            `;
+            ul.appendChild(li);
+        });
+
+        booksContainer.appendChild(ul);
+    } catch (error) {
+        const booksContainer = document.getElementById('available-books');
+        booksContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+    }
+}
+
         // Logout function
         async function logout() {
             try {
@@ -155,6 +234,12 @@
         <!-- Overdue loans will be populated here -->
     </ul>
 
+    <h2>All loans</h2>
+    <button onclick="fetchAllLoans()">Get All Loans</button>
+    <ul id="all-loans-list">
+        <!-- Overdue loans will be populated here -->
+    </ul>
+
     <h2>Return Resource</h2>
     <form id="return-resource-form" onsubmit="markResourceAsReturned(event)">
         <label for="return-loan-id">Loan ID:</label><br>
@@ -172,6 +257,14 @@
     </form>
     <div id="student-profile">
         <!-- Student profile will be populated here -->
+    </div>
+
+    <h2>Get All Available Books</h2>
+    <form id="available-books-form" onsubmit="fetchAvailableBooks(event)">
+        <button type="submit">Fetch Available Books</button>
+    </form>
+    <div id="available-books">
+    <!-- Available books will be displayed here -->
     </div>
 
     <h2>Assign Resource</h2>
