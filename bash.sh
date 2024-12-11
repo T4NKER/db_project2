@@ -22,6 +22,12 @@ curl -X PATCH "$BASE_URL/student/update-password" \
     -d "old_password=studentpasss&new_password=newpass&student_id=1"
 echo -e "\n"
 
+echo "3. PATCH /student/update-password"
+curl -X PATCH "$BASE_URL/student/update-password" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "old_password=studentpass&new_password=newpass&student_id=1"
+echo -e "\n"
+
 # Library Agent Endpoints
 echo "Testing Library Agent Endpoints..."
 

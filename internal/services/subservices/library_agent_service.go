@@ -149,8 +149,19 @@ func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
 
 	tx := l.db.Begin()
 
+	var exists bool
+	err := tx.Table("loan").Select("COUNT(*) > 0").Where("loan_id = ?", loanID).Find(&exists).Error
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to check loan existence: %w", err)
+	}
+	if !exists {
+		tx.Rollback()
+		return fmt.Errorf("loan_id %d does not exist", loanID)
+	}
+
 	var returnDate sql.NullTime
-	err := tx.Table("loan").Select("return_date").Where("loan_id = ?", loanID).Scan(&returnDate).Error
+	err = tx.Table("loan").Select("return_date").Where("loan_id = ?", loanID).Scan(&returnDate).Error
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -185,6 +196,15 @@ func (l *LibraryAgentService) MarkResourceReturned(loanID int) error {
 
 func (l *LibraryAgentService) GetStudentProfile(studentID int) (map[string]interface{}, error) {
 	var profile map[string]interface{}
+	var exists bool
+
+	err := l.db.Table("student").Select("COUNT(*) > 0").Where("student_id = ?", studentID).Find(&exists).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to check student existence: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("student_id %d does not exist", studentID)
+	}
 
 	query := `
     SELECT 
@@ -201,7 +221,7 @@ WHERE s.student_id = ?
 GROUP BY s.first_name, s.last_name, s.email, s.phone, s.postal_address;
     `
 
-	err := l.db.Raw(query, studentID).Scan(&profile).Error
+	err = l.db.Raw(query, studentID).Scan(&profile).Error
 	if err != nil {
 		return nil, err
 	}

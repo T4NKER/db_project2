@@ -114,6 +114,9 @@
                 }
 
                 const data = await response.json();
+
+
+                
                 const profileDiv = document.getElementById('student-profile');
                 profileDiv.innerHTML = `
                     <p>Name: ${data.student_profile.first_name + " " + data.student_profile.last_name}</p>
